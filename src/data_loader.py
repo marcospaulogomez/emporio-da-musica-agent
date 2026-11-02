@@ -1,0 +1,139 @@
+import pandas as pd
+from pypdf import PdfReader
+from src.config import resolve_data_file
+
+
+class StoreDataStore:
+    """
+    Data layer responsible for loading, cleaning, and relating
+    operational tables (.csv) and the store policy manual (.pdf).
+    """
+
+    def __init__(self):
+        self.categories_df = self._load_csv("categories.csv")
+        self.customers_df = self._load_csv("customers.csv")
+        self.products_df = self._load_csv("products.csv")
+        self.promotions_df = self._load_csv("promotions.csv")
+        self.orders_df = self._load_csv("orders.csv")
+        self.order_items_df = self._load_csv("order_items.csv")
+
+        # Consolidated tables (pre-processed for fast and exact queries)
+        self.catalog_df = self._build_enriched_catalog()
+        self.orders_full_df = self._build_enriched_orders()
+        self.policies_text = self._load_policies_pdf()
+
+    def _load_csv(self, clean_name: str) -> pd.DataFrame:
+        prefixed_name = f"desafio_tecnico_ai_eng - {clean_name}"
+        path = resolve_data_file(clean_name, [prefixed_name])
+        return pd.read_csv(path)
+
+    def _load_policies_pdf(self) -> str:
+        path = resolve_data_file(
+            "politicas_da_loja.pdf",
+            ["políticas_da_loja.pdf", "desafio_tecnico_ai_eng - politicas_da_loja.pdf"]
+        )
+        reader = PdfReader(str(path))
+        pages_text = []
+        for idx, page in enumerate(reader.pages, start=1):
+            text = page.extract_text() or ""
+            pages_text.append(f"--- PAGE {idx} ---\n{text.strip()}")
+        return "\n\n".join(pages_text)
+
+    def _build_enriched_catalog(self) -> pd.DataFrame:
+        """
+        Merges products, categories, and promotions (active/expired) and computes
+        final prices following the non-cumulative PIX rule (Section 6.2).
+        """
+        df = self.products_df.merge(
+            self.categories_df.rename(columns={
+                "name": "category_name",
+                "description": "category_description"
+            }),
+            on="category_id",
+            how="left"
+        )
+
+        # Filter active promotions (is_active == 1)
+        active_promos = (
+            self.promotions_df[self.promotions_df["is_active"] == 1]
+            .sort_values("discount_percent", ascending=False)
+            .drop_duplicates(subset=["product_id"])
+            .rename(columns={
+                "discount_percent": "active_discount_percent",
+                "description": "active_promo_name"
+            })[["product_id", "active_discount_percent", "active_promo_name"]]
+        )
+
+        # Filter expired promotions (is_active == 0) for transparency (Section 7.3)
+        expired_promos = (
+            self.promotions_df[self.promotions_df["is_active"] == 0]
+            .sort_values("discount_percent", ascending=False)
+            .drop_duplicates(subset=["product_id"])
+            .rename(columns={
+                "discount_percent": "expired_discount_percent",
+                "description": "expired_promo_name"
+            })[["product_id", "expired_discount_percent", "expired_promo_name"]]
+        )
+
+        df = df.merge(active_promos, on="product_id", how="left")
+        df = df.merge(expired_promos, on="product_id", how="left")
+
+        df["active_discount_percent"] = df["active_discount_percent"].fillna(0).astype(int)
+        df["has_active_promo"] = df["active_discount_percent"] > 0
+
+        # Final price considering active promotions
+        df["final_price_brl"] = (
+            df["price_brl"] * (1 - df["active_discount_percent"] / 100.0)
+        ).round(2)
+
+        # Rule 6.2: PIX gives a 5% discount ONLY if there is no active promotion
+        df["pix_price_brl"] = df.apply(
+            lambda row: row["final_price_brl"]
+            if row["has_active_promo"]
+            else round(row["price_brl"] * 0.95, 2),
+            axis=1
+        )
+
+        # Real availability: must be active status AND stock > 0
+        df["is_available"] = (df["status"] == "active") & (df["stock_quantity"] > 0)
+
+        return df
+
+    def _build_enriched_orders(self) -> pd.DataFrame:
+        """
+        Merges orders, customers, and aggregated order items with product details.
+        """
+        items_detailed = self.order_items_df.merge(
+            self.products_df[["product_id", "name", "price_brl"]],
+            on="product_id",
+            how="left"
+        )
+        items_detailed["item_summary"] = (
+            items_detailed["quantity"].astype(str) + "x " + items_detailed["name"]
+        )
+
+        grouped_items = (
+            items_detailed.groupby("order_id")
+            .agg(
+                items_list=("item_summary", lambda x: " | ".join(x)),
+                product_ids=("product_id", list)
+            )
+            .reset_index()
+        )
+
+        orders_full = self.orders_df.merge(
+            self.customers_df.rename(columns={
+                "name": "customer_name",
+                "phone": "customer_phone",
+                "email": "customer_email",
+                "city": "customer_city"
+            }),
+            on="customer_id",
+            how="left"
+        ).merge(grouped_items, on="order_id", how="left")
+
+        return orders_full
+
+
+# Singleton instance for tool reuse
+db = StoreDataStore()
