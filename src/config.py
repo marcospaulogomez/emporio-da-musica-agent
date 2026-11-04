@@ -1,6 +1,15 @@
 import os
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
+
+# Ensure UTF-8 output on Windows terminals
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 # Load environment variables from .env file
 load_dotenv()

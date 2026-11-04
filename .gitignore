@@ -6,6 +6,9 @@ env/
 # Variaveis de ambiente
 .env
 
+# Historico de sessao local
+chat_history.json
+
 # Cache do Python
 __pycache__/
 *.py[cod]
