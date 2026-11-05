@@ -1,19 +1,19 @@
-# Ambientes virtuais
+# Virtual environments
 .venv/
 venv/
 env/
 
-# Variaveis de ambiente
+# Environment variables
 .env
 
-# Historico de sessao local
+# Local session history
 chat_history.json
 
-# Cache do Python
+# Python cache
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Arquivos de sistema / IDE
+# OS / IDE files
 .DS_Store
 .vscode/

@@ -1,18 +1,20 @@
-# Exemplos de Interação com o Agente
+# Agent Interaction Examples
 
-Abaixo estão 5 interações testadas com o agente, cobrindo consultas ao catálogo, regras de negócio do manual (promoções expiradas, parcelamento, frete e devoluções), cruzamento de pedidos em tempo real e tratamento de itens fora de escopo.
+Below are 5 conversations tested with the agent, covering catalog queries, business rules from the store manual (expired promotions, installment rules, shipping, and returns), real-time order lookups, and out-of-scope item handling.
+
+*(Note: The dialogues themselves are in Brazilian Portuguese, as the agent serves customers of Empório da Música in Campo Grande/MS).*
 
 ---
 
-## 1. Catálogo de produtos com limite de preço
-**Cenário:** Consulta de violões disponíveis até R$ 1.000,00. O agente filtra apenas itens com `status = active` e `stock_quantity > 0` (deixando de fora o *Giannini GF-3D*, que está sem estoque) e informa o valor com 5% de desconto no PIX.
+## 1. Product catalog search with budget filter
+**Scenario:** Searching for available acoustic guitars (`Violões`) up to R$ 1,000.00. The agent filters only items with `status = active` and `stock_quantity > 0` (excluding the out-of-stock *Giannini GF-3D*) and informs the 5% PIX discount.
 
-**Cliente:**
+**Customer:**
 > Quais opções de violões disponíveis custando até R$1000?
 
-**Ferramenta acionada:** `search_products(category_id=5, max_price=1000, only_available=True)`
+**Tool called:** `search_products(category_id=5, max_price=1000, only_available=True)`
 
-**Agente:**
+**Agent:**
 > Olá! Tudo bem? Seja bem-vindo(a) à Empório da Música!
 >
 > Consultei nosso estoque aqui e temos **12 modelos de violões disponíveis** até R$ 1.000,00. Como nenhum deles está com promoção ativa no momento, todos têm **5% de desconto para pagamento à vista no PIX**:
@@ -39,15 +41,15 @@ Abaixo estão 5 interações testadas com o agente, cobrindo consultas ao catál
 
 ---
 
-## 2. Consulta de preço e tratamento de promoção expirada
-**Cenário:** O cliente pergunta o preço do *Takamine GD20* (ID 95). Na base `promotions.csv`, esse item possui um registro de 12% de desconto com `is_active = 0`. O agente informa o preço atual de tabela, aplica os 5% do PIX e explica o parcelamento conforme a Seção 3 do manual.
+## 2. Price lookup & expired promotion handling
+**Scenario:** The customer asks for the price of the *Takamine GD20* (ID 95). In `promotions.csv`, this item has a 12% discount entry with `is_active = 0`. The agent informs the current list price transparently, applies the 5% PIX discount, and explains installment options per Section 3 of the manual.
 
-**Cliente:**
+**Customer:**
 > Quanto custa o Takamine GD20? Ele ainda tá com aquele desconto de 12%?
 
-**Ferramenta acionada:** `search_products(query="Takamine GD20")`
+**Tool called:** `search_products(query="Takamine GD20")`
 
-**Agente:**
+**Agent:**
 > Olá! O **Takamine GD20 Dreadnought Natural** é um excelente violão, com tampo sólido em cedro e um timbre muito encorpado.
 >
 > Sendo bem transparente com você: aquela promoção anterior de 12% ("Oferta Especial") já **encerrou** e não está mais ativa no nosso sistema.
@@ -61,15 +63,15 @@ Abaixo estão 5 interações testadas com o agente, cobrindo consultas ao catál
 
 ---
 
-## 3. Situação não trivial: devolução cruzando políticas e status de pedido em tempo real
-**Cenário:** Em uma conversa de dois turnos, o cliente pergunta sobre devolução por arrependimento e em seguida informa os dados do pedido. O agente consulta tanto o PDF de políticas quanto a base de pedidos (`orders.csv` / `customers.csv`).
+## 3. Non-trivial scenario: order return combining store policy + real-time order lookup
+**Scenario:** Across two turns, the customer asks about returning an order due to buyer's remorse and then provides their order details. The agent queries both the policy manual PDF and the orders table (`orders.csv` / `customers.csv`).
 
-**Cliente:**
+**Customer:**
 > Me arrependi da minha compra, posso devolver meu pedido?
 
-**Ferramenta acionada:** `consult_store_policies(topic="arrependimento devolução troca prazo")`
+**Tool called:** `consult_store_policies(topic="arrependimento devolução troca prazo")`
 
-**Agente:**
+**Agent:**
 > Olá! Pode ficar tranquilo(a), nós seguimos o Código de Defesa do Consumidor e vamos te orientar.
 >
 > Pela nossa política de **Direito de Arrependimento (para compras online)**:
@@ -80,12 +82,12 @@ Abaixo estão 5 interações testadas com o agente, cobrindo consultas ao catál
 >
 > Você poderia me informar o **número do seu pedido** ou o seu **nome completo** para eu verificar o status da sua compra no sistema?
 
-**Cliente:**
+**Customer:**
 > Sou a Ana Carolina Ferreira, pedido número 8.
 
-**Ferramenta acionada:** `check_order_status(order_id=8, customer_name="Ana Carolina Ferreira")`
+**Tool called:** `check_order_status(order_id=8, customer_name="Ana Carolina Ferreira")`
 
-**Agente:**
+**Agent:**
 > Obrigado, Ana Carolina! Localizei o seu **Pedido #8** aqui no sistema:
 >
 > - **Produto:** 1x Ukulele Kala KA-C Concert Mogno
@@ -101,15 +103,15 @@ Abaixo estão 5 interações testadas com o agente, cobrindo consultas ao catál
 
 ---
 
-## 4. Informações gerais da loja e frete
-**Cenário:** Consulta de endereço, horários de atendimento e regras de entrega.
+## 4. General store information & business hours
+**Scenario:** Looking up the store's physical address, contact channels, and operating hours.
 
-**Cliente:**
+**Customer:**
 > Qual o endereço da loja e o horário de funcionamento?
 
-**Ferramenta acionada:** `consult_store_policies(topic="endereço horário funcionamento contato")`
+**Tool called:** `consult_store_policies(topic="endereço horário funcionamento contato")`
 
-**Agente:**
+**Agent:**
 > Olá! Aqui estão os dados e horários de atendimento da **Empório da Música**:
 >
 > - **Endereço:** Rua 14 de Maio, 3200 — Centro, Campo Grande/MS (CEP 79202-333)
@@ -125,17 +127,17 @@ Abaixo estão 5 interações testadas com o agente, cobrindo consultas ao catál
 
 ---
 
-## 5. Produto fora de estoque + Item fora do escopo (Acessórios)
-**Cenário:** O cliente pergunta por um violão que está com estoque zerado (*Giannini GF-3D*, ID 96) e aproveita para pedir acessórios (cordas e cabo), que não fazem parte do escopo da loja.
+## 5. Out-of-stock product + Out-of-scope request (Accessories)
+**Scenario:** The customer asks for an acoustic guitar that has `0` stock (*Giannini GF-3D*, ID 96) and also asks to buy accessories (strings and a P10 cable), which fall outside the store's instrument-only scope.
 
-**Cliente:**
+**Customer:**
 > Vocês têm o violão Giannini GF-3D? E quero aproveitar pra comprar um jogo de cordas e um cabo P10.
 
-**Ferramentas acionadas:**
+**Tools called:**
 1. `search_products(query="Giannini GF-3D")`
 2. `handle_out_of_scope_request(item_requested="jogo de cordas e cabo P10")`
 
-**Agente:**
+**Agent:**
 > Olá! Verifiquei aqui no nosso sistema e tenho dois avisos importantes sobre o seu pedido:
 >
 > **1. Sobre o violão Giannini GF-3D Dreadnought Sunburst:**

@@ -134,7 +134,7 @@ class EmporioMusicAgent:
         raw_gemini_key = os.getenv("GEMINI_API_KEY", "").strip().strip('"').strip("'")
 
         # Accept OpenAI key from either OPENAI_API_KEY or GEMINI_API_KEY (if user pasted sk-... there)
-        if raw_openai_key and not raw_openai_key.startswith("cole_sua_chave") and not raw_openai_key.startswith("sua_chave"):
+        if raw_openai_key and not raw_openai_key.startswith(("cole_sua_chave", "sua_chave", "your_openai")):
             self.api_key = raw_openai_key
             self.provider = "openai"
         elif raw_gemini_key.startswith("sk-"):
