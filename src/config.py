@@ -11,16 +11,19 @@ if hasattr(sys.stdout, "reconfigure"):
     except Exception:
         pass
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from .env file (override=True reloads changes)
+load_dotenv(override=True)
 
 # Base project directories
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 
-# Gemini API Configuration
+# OpenAI & Gemini API Configuration (supports both providers seamlessly)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
+
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
 
 
 def resolve_data_file(clean_name: str, fallback_candidates: list[str]) -> Path:

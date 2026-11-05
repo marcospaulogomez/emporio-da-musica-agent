@@ -1,7 +1,7 @@
 # 🎸 Empório da Música — Agente Inteligente de Atendimento ao Cliente
 
 > **Desafio Técnico — AI Engineer (Artefact)**  
-> Protótipo de agente conversacional em Python para automação e suporte ao atendimento da **Empório da Música** (Campo Grande/MS), integrando **Function Calling nativo**, **consulta relacional em tempo real (Pandas)** e **recuperação contextual de políticas (PDF)**.
+> Protótipo de agente conversacional em Python para automação e suporte ao atendimento da **Empório da Música** (Campo Grande/MS), integrando **Function Calling (OpenAI `gpt-4o-mini` / Gemini)**, **consulta relacional em tempo real (Pandas)** e **recuperação contextual de políticas (PDF)**.
 
 ---
 
@@ -42,7 +42,7 @@ Marcos_Desafio_Tecnico/
 │   ├── tools.py                # Ferramentas (Tools) expostas ao LLM via Function Calling
 │   ├── prompts.py              # System Prompt estruturado com persona e guardrails de negócio
 │   ├── memory.py               # Gerenciamento e persistência local do histórico (JSON)
-│   └── agent.py                # Controlador principal (EmporioMusicAgent) com SDK google-genai
+│   └── agent.py                # Controlador principal (EmporioMusicAgent) com OpenAI Function Calling
 ├── main.py                     # Interface de linha de comando (CLI) interativa com Rich
 ├── requirements.txt            # Dependências do projeto
 ├── .env.example                # Template de configuração de variáveis de ambiente
@@ -55,7 +55,7 @@ Marcos_Desafio_Tecnico/
 
 ### 1. Pré-requisitos
 - **Python 3.10+** instalado.
-- Uma chave de API do Google Gemini (`GEMINI_API_KEY`), que pode ser obtida gratuitamente no [Google AI Studio](https://aistudio.google.com/).
+- Uma chave de API da **OpenAI** (`OPENAI_API_KEY`, ex.: `sk-...`). *(O controlador também suporta chaves do Google Gemini `GEMINI_API_KEY` de forma transparente caso o avaliador prefira).*
 
 ### 2. Configuração do Ambiente Virtual e Dependências
 
@@ -77,7 +77,7 @@ pip install -r requirements.txt
 
 ### 3. Configuração das Variáveis de Ambiente (`.env`)
 
-Copie o arquivo `.env.example` para `.env` e insira sua chave de API do Gemini:
+Copie o arquivo `.env.example` para `.env` e insira sua chave de API da OpenAI:
 
 ```bash
 # Windows (PowerShell)
@@ -89,8 +89,8 @@ cp .env.example .env
 
 Conteúdo do arquivo `.env`:
 ```env
-GEMINI_API_KEY=sua_chave_api_do_gemini_aqui
-GEMINI_MODEL=gemini-2.5-flash
+OPENAI_API_KEY=sua_chave_api_da_openai_aqui
+OPENAI_MODEL=gpt-4o-mini
 ```
 
 ### 4. Executando o Agente (CLI Interativa)
@@ -108,14 +108,15 @@ Durante a execução na CLI, você pode conversar livremente com o assistente ou
 
 ## 🧠 Justificativa das Decisões Técnicas
 
-### 1. Framework e Abordagem do Agente: *Híbrido (Native Function Calling + Camada Relacional Pandas + Retrieval de PDF)*
-Em vez de utilizar frameworks pesados com múltiplas camadas de abstração (como LangChain ou LlamaIndex) para um conjunto de dados estruturado e de volume controlado, optamos pelo **SDK oficial `google-genai`** com **Automatic Function Calling (AFC)** combinado a uma camada de dados determinística em **Pandas** (`StoreDataStore`).
-- **Por que não usar RAG vetorial para os CSVs?** Embeddings vetoriais são imprecisos para filtros numéricos exatos (`preço <= R$ 1.000`, `stock_quantity > 0`), agregações e joins entre 5 tabelas (`products`, `categories`, `promotions`, `orders`, `order_items`, `customers`). Ao pré-processar os relacionamentos no `data_loader.py` e expor funções tipadas em Python (`search_products`, `check_order_status`), garantimos **100% de exatidão matemática** nos preços, descontos e estoques.
+### 1. Framework e Abordagem do Agente: *Híbrido (Function Calling + Camada Relacional Pandas + Retrieval de PDF)*
+Em vez de utilizar frameworks pesados com múltiplas camadas de abstração (como LangChain ou LlamaIndex) para um conjunto de dados estruturado e de volume controlado, optamos por um ciclo enxuto e transparente de **Tool/Function Calling** combinado a uma camada de dados determinística em **Pandas** (`StoreDataStore`).
+- **Por que não usar RAG vetorial para os CSVs?** Embeddings vetoriais são imprecisos para filtros numéricos exatos (`preço <= R$ 1.000`, `stock_quantity > 0`), agregações e joins entre 6 tabelas (`products`, `categories`, `promotions`, `orders`, `order_items`, `customers`). Ao pré-processar os relacionamentos no `data_loader.py` e expor funções tipadas em Python (`search_products`, `check_order_status`), garantimos **100% de exatidão matemática** nos preços, descontos e estoques.
 - **Por que Retrieval por Seções Ranqueadas para o PDF?** O manual `politicas_da_loja.pdf` possui 8 páginas enxutas (~1.200 palavras). A ferramenta `consult_store_policies` extrai o texto via `pypdf`, normaliza acentuação, remove *stopwords* e ranqueia as páginas por densidade de palavras-chave (com *fallback* para o documento integral). Isso elimina dependências externas de bancos vetoriais (Chroma/FAISS), reduz a latência a zero e evita perda de contexto em regras cruzadas.
 
-### 2. Modelo e Provedor: *Google Gemini (`gemini-2.5-flash`)*
-- Escolhemos o **`gemini-2.5-flash`** via Google AI Studio por oferecer excelente capacidade de raciocínio em Português, suporte nativo de ponta a *multi-tool calling* (chamando mais de uma ferramenta na mesma rodada quando necessário, ex.: checar política de devolução + status de pedido), baixa latência para atendimento via chat e uma camada gratuita (*free tier*) generosa que facilita a avaliação do projeto.
-- A temperatura foi configurada em **`0.2`** (`src/agent.py`) para priorizar fidelidade factual aos dados retornados pelas ferramentas, mantendo a fluidez e simpatia da persona.
+### 2. Modelo e Provedor: *OpenAI (`gpt-4o-mini`) com suporte dual a Gemini*
+- Escolhemos o **`gpt-4o-mini`** da OpenAI como modelo principal por sua altíssima confiabilidade em **Function Calling multi-ferramenta** (sendo capaz de chamar `consult_store_policies` e `check_order_status` na mesma rodada ou em sequência), excelente domínio do Português do Brasil, baixa latência e ótimo custo-benefício.
+- Adicionalmente, o controlador `EmporioMusicAgent` em `src/agent.py` foi arquitetado de forma agnóstica para aceitar também `GEMINI_API_KEY` (`gemini-2.5-flash`), facilitando os testes pelo time avaliador independentemente do provedor que tenham disponível.
+- A temperatura foi configurada em **`0.2`** para priorizar fidelidade factual aos dados retornados pelas ferramentas, mantendo a fluidez e simpatia da persona.
 
 ### 3. Tratamento de Dados e Regras de Negócio Pré-Computadas (`src/data_loader.py`)
 Durante a análise exploratória das tabelas em `data/`, identificamos situações críticas de negócio que foram tratadas diretamente na camada de dados:
@@ -125,7 +126,7 @@ Durante a análise exploratória das tabelas em `data/`, identificamos situaçõ
 - **Busca Insensível a Acentos e Plurais:** A função `search_products` normaliza caracteres Unicode (`NFKD`) e radicais em português (permitindo que buscas por `"violões"`, `"violao"` ou `"violão"` encontrem todos os itens relevantes combinando nome, descrição, categoria e JSON de `specs`).
 
 ### 4. Persistência do Histórico de Conversa (`src/memory.py`)
-- O contexto multi-turno em tempo de execução é mantido pela sessão nativa `client.chats.create` do SDK do Gemini (permitindo que o agente lembre o nome do cliente, o produto discutido na mensagem anterior e o histórico de chamadas de ferramentas).
+- O contexto multi-turno em tempo de execução é mantido na lista estruturada de mensagens (`self._messages`) do controlador, permitindo que o agente lembre o nome do cliente, o produto discutido na mensagem anterior e o histórico de chamadas de ferramentas.
 - Adicionalmente, implementamos a classe `ConversationMemory`, que persiste cada turno (`timestamp`, `user`, `assistant`) em disco no arquivo `chat_history.json`, permitindo auditoria das conversas e consulta via comando `/historico` na CLI.
 
 ### 5. Estratégia de Prompt e Guardrails (`src/prompts.py`)
@@ -163,9 +164,8 @@ Cenários cobertos no documento:
 ## 🤖 Uso de Assistentes de Código (Workflow com IA)
 
 Em conformidade com as diretrizes de transparência do desafio:
-- **Ferramenta utilizada:** Assistente de IA integrado à IDE (**Google Antigravity / Gemini**).
+- **Ferramenta utilizada:** Assistente de IA integrado à IDE (**Google Antigravity**).
 - **Como foi utilizado no workflow:**
   1. **Análise Exploratória e Verificação de Regras:** Apoio na inspeção cruzada entre as 6 tabelas `.csv` e as 8 páginas do `politicas_da_loja.pdf` para mapear casos de borda (como promoções expiradas `is_active == 0`, produtos com `stock_quantity == 0` ou status `discontinued`/`coming_soon`, e não cumulatividade do PIX).
-  2. **Depuração e Refinamento de Código:** Diagnóstico de configuração do modelo no `.env` (`gemini-2.5-flash`), normalização de acentuação/plurais nas buscas em Pandas (`src/tools.py`), tratamento de codificação UTF-8 no terminal Windows e construção da interface CLI com a biblioteca `rich` (`main.py`).
+  2. **Depuração e Refinamento de Código:** Implementação de Function Calling com suporte a OpenAI (`gpt-4o-mini`) e Gemini, normalização de acentuação/plurais nas buscas em Pandas (`src/tools.py`), tratamento de codificação UTF-8 no terminal Windows e construção da interface CLI com a biblioteca `rich` (`main.py`).
   3. **Documentação e Casos de Teste:** Estruturação da documentação técnica no `README.md` e validação dos cenários de conversação em `examples/exemplos_interacao.md`.
-
